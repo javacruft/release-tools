@@ -1,0 +1,92 @@
+#!/bin/bash -e
+#
+#  Update requirements in all charms, with some exceptions.
+#
+#  Remove tests/charmhelpers in favor of venv charmhelpers.
+#
+#  Propose gerrit reviews.
+#
+#  Optionally avoid the gerrit review by exporting env var DRY_RUN=True
+#
+#    - For src charms:
+#        - Updates src/requirements.txt and src/test-requirements.txt
+#        - Does NOT update ./requirements.txt and ./test-requirements.txt
+#
+#    - For classic charms:
+#        - Updates ./requirements.txt and ./test-requirements.txt
+
+gerrit_topic="requirements-update"
+
+charms="$(cat charms.txt)"
+src_charms="$(cat src-charms.txt)"
+basedir="$(pwd)"
+branch="$1"
+usage="usage: requirements-update <master||stable/nn.nn>
+
+This will create gerrit reviews!  Set environment variable in
+advance if that should be avoided:
+  export DRY_RUN=True
+"
+
+if [ -z "$branch" ]; then
+    echo -e "$usage"
+    exit 1
+fi
+
+# Expect user to have git config ready for gerrit use
+git config --get gitreview.username || ( echo " ! Not set: gitreview.username git config option"; echo -e "$usage"; exit 1 )
+
+
+function git_get(){
+    [ -d $charm ] && rm -Rf $charm
+    git clone https://github.com/openstack/charm-$1 $1
+    git checkout $2
+}
+
+
+function gerrit_propose(){
+  if [ "${DRY_RUN^^}" == "TRUE" ]; then
+    echo " . Not proposing gerrit (dry run)."
+    return 0
+  fi
+  (
+    echo " . Submitting gerrit review for $charm"
+#    cd $charm
+#    git review
+  )
+}
+
+
+for charm in $charms; do
+  if [[ $src_charms == *"$charm"* ]]; then
+    # src charms
+    charm_global_dir="$basedir/requirements/source/src"
+    charm_target_dir="$basedir/$charm/src"
+    base_global_dir="$basedir/requirements/source"
+    base_target_dir="$basedir/$charm"
+  else
+    # classic charms
+    charm_global_dir="$basedir/requirements/classic"
+    charm_target_dir="$basedir/$charm"
+    base_global_dir="$charm_global_dir"
+    base_target_dir="$basedir/$charm"
+  fi
+
+
+  echo " . $charm "
+  (
+    git_get $charm $branch
+    cd $charm
+
+    # Expect amulet tests to work with tip of charmhelpers in master and stable charms.
+    git rm $charm_target_dir/tests/charmhelpers -r
+
+    cp -fv $charm_global_dir/requirements.txt $charm_target_dir
+    cp -fv $charm_global_dir/test-requirements.txt $charm_target_dir
+    cp -fv $base_global_dir/tox.ini $base_target_dir
+    git add .
+    git status -s
+  )
+
+  gerrit_propose $charm
+done

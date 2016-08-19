@@ -1,0 +1,7 @@
+# Do not commit changes to this file in charm repos without also updating
+# OpenStack Charms global requirements files at:
+#   https://github.com/openstack-charmers/release-tools.
+#
+# Type: src charm
+#
+# Intentionally blank.  Place all reqs in test-requirements.txt.
