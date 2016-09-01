@@ -21,10 +21,11 @@ charms="$(cat charms.txt)"
 src_charms="$(cat src-charms.txt)"
 basedir="$(pwd)"
 branch="$1"
+commit_msg_file="$basedir/requirements/commit-msg.txt"
 usage="usage: requirements-update <master||stable/nn.nn>
 
-This will create gerrit reviews!  Set environment variable in
-advance if that should be avoided:
+This will create gerrit reviews using commit-msg.txt! Set environment
+variable in advance if that should be avoided:
   export DRY_RUN=True
 "
 
@@ -37,10 +38,19 @@ fi
 git config --get gitreview.username || ( echo " ! Not set: gitreview.username git config option"; echo -e "$usage"; exit 1 )
 
 
+commit_msg="$(cat $commit_msg_file ||:)"
+if [ -z "$commit_msg" ]; then
+    echo " ! $commit_msg_file not found or empty."
+    exit 1
+fi
+
 function git_get(){
     [ -d $charm ] && rm -Rf $charm
+  (
     git clone https://github.com/openstack/charm-$1 $1
+    cd $1
     git checkout $2
+  )
 }
 
 
@@ -79,7 +89,7 @@ for charm in $charms; do
     cd $charm
 
     # Expect amulet tests to work with tip of charmhelpers in master and stable charms.
-    git rm $charm_target_dir/tests/charmhelpers -r
+    [[ -d $charm_target_dir/tests/charmhelpers ]] && git rm $charm_target_dir/tests/charmhelpers -r
 
     cp -fv $charm_global_dir/requirements.txt $charm_target_dir
     cp -fv $charm_global_dir/test-requirements.txt $charm_target_dir

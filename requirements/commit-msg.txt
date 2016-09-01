@@ -1,0 +1,5 @@
+Update requirements
+
+This sets requirements globally in all OpenStack Charms
+repos, except for the requirements in the base path of
+src charms.
